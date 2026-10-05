@@ -1,0 +1,14 @@
+tree,instance_id,rep,exit_status,cost,n_calls,model,t_start,t_done
+django__django-12708__r0,django__django-12708,0,Submitted,0.054602568,55,deepseek/deepseek-flash,1791223079.8806813,1791223416.1753242
+django__django-13158__r0,django__django-13158,0,Submitted,0.04978496400000001,52,deepseek/deepseek-flash,1791222287.149334,1791222608.405462
+django__django-15851__r0,django__django-15851,0,Submitted,0.009534359999999999,11,deepseek/deepseek-flash,1791222960.188726,1791222993.9404402
+django__django-15902__r0,django__django-15902,0,Submitted,0.11448881999999996,81,deepseek/deepseek-flash,1791222877.0449288,1791223775.8541014
+django__django-16041__r0,django__django-16041,0,Submitted,0.015388104000000003,25,deepseek/deepseek-flash,1791223022.441634,1791223126.889836
+django__django-16229__r0,django__django-16229,0,Submitted,0.022104755999999996,24,deepseek/deepseek-flash,1791222952.7210627,1791223051.3763058
+psf__requests-2317__r0,psf__requests-2317,0,Submitted,0.03875370599999999,37,deepseek/deepseek-flash,1791222276.5386837,1791222537.9074678
+pydata__xarray-5131__r0,pydata__xarray-5131,0,Submitted,0.01237548,18,deepseek/deepseek-flash,1791223158.311171,1791223232.6190078
+pylint-dev__pylint-7228__r0,pylint-dev__pylint-7228,0,Submitted,0.10075261199999999,89,deepseek/deepseek-flash,1791223263.6869123,1791223747.6913254
+scikit-learn__scikit-learn-13496__r0,scikit-learn__scikit-learn-13496,0,Submitted,0.017738028,22,deepseek/deepseek-flash,1791222847.7419105,1791222915.9013648
+sphinx-doc__sphinx-8721__r0,sphinx-doc__sphinx-8721,0,Submitted,0.026461427999999995,30,deepseek/deepseek-flash,1791222638.430212,1791222850.5789459
+sympy__sympy-14308__r0,sympy__sympy-14308,0,Submitted,0.10831233599999998,87,deepseek/deepseek-flash,1791222283.579585,1791222914.7300215
+sympy__sympy-21171__r0,sympy__sympy-21171,0,Submitted,0.029738424000000003,26,deepseek/deepseek-flash,1791222565.3909187,1791222820.7103517

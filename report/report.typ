@@ -10,24 +10,16 @@
 #show figure.where(kind: image): set figure(supplement: "圖")
 #set table(stroke: (x, y) => if y == 0 { (bottom: 0.6pt) } else { none }, inset: (x: 4pt, y: 2.5pt))
 
-// Every number below is read from numbers.json, which memtrace/analyze.py recomputes from raw/.
-#let N = json("../numbers.json")
-#let A = N.at("A", default: (:))
-#let B = N.at("B", default: (:))
-#let H = N.hypotheses
-#let get(d, ..path) = {
-  let x = d
-  for k in path.pos() { x = if type(x) == dictionary { x.at(k, default: none) } else { none } }
-  x
-}
-#let f(x, d: 1) = if x == none { "—" } else { str(calc.round(float(x), digits: d)) }
-#let pct(x, d: 0) = if x == none { "—" } else { str(calc.round(100 * float(x), digits: d)) + "%" }
-#let verdict(v) = if v == none { "無資料" } else if v { "成立" } else { "不成立" }
+#import "lib.typ": *
 
 #align(center)[
   #text(14pt, weight: "bold")[agent-memtrace：階段感知的 coding agent sandbox 記憶體特徵化] \
   #v(2pt)
   #text(8.5pt, fill: rgb("#52514e"))[資料產生 #N.meta.generated · git #N.meta.git · 預先登記 sha256 #raw(N.meta.prereg_sha256.slice(0, 16))…]
+]
+
+#if get(A, "monitor", "complete") != true [
+  #block(fill: rgb("#fdf3e1"), inset: 6pt, radius: 3pt, width: 100%)[*草稿*：A 的監測窗預定到 2026-10-08 09:00，本版只含 #get(A, "monitor", "start") 至 #get(A, "monitor", "last_sample") 的資料；A 的數字與判定在最終版會改變。B 已完成。]
 ]
 
 #include "summary.typ"

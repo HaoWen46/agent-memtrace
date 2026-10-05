@@ -254,11 +254,14 @@ def fig_timeline(panels, path):
     fig, axes = plt.subplots(len(panels), 1, figsize=(7, 2.3 * len(panels)), squeeze=False)
     for ax, (title, w, ivs, t0) in zip(axes[:, 0], panels):
         x = w.t.values - t0
-        span = x.max() - x.min() if len(x) else 1
+        lo, hi = (x.min(), x.max()) if len(x) else (0, 1)
+        span = hi - lo
         for r in ivs.itertuples():
             ph = r.phase.replace("_unclosed", "")
             if ph in PH_COLOR:
-                a, b = r.t0 - t0, r.t1 - t0
+                a, b = max(r.t0 - t0, lo), min(r.t1 - t0, hi)
+                if b <= a:
+                    continue
                 if b - a < 0.004 * span:  # widen sub-pixel tool calls so they stay visible
                     a, b = (a + b) / 2 - 0.002 * span, (a + b) / 2 + 0.002 * span
                 ax.axvspan(a, b, color=PH_COLOR[ph], alpha=0.18, lw=0)
@@ -267,6 +270,7 @@ def fig_timeline(panels, path):
         ax.set_title(title)
         ax.set_ylabel("MiB")
         ax.set_ylim(bottom=0)
+        ax.set_xlim(lo, hi)
     handles = [plt.Line2D([], [], color=INK, label="Rss"), plt.Line2D([], [], color=INK2, ls="--", label="Referenced since phase start")]
     handles += [matplotlib.patches.Patch(color=c, alpha=0.35, label=p) for p, c in PH_COLOR.items()]
     axes[-1, 0].set_xlabel("seconds from task start")
@@ -286,10 +290,10 @@ def fig_cold_cdf(groups_by_w, path):
                 ax.step(v, np.arange(1, len(v) + 1) / len(v), where="post", color=c, label=f"{lab} (n={len(v)})")
         ax.axvline(0.5, color=MUTED, lw=0.8, ls=":")
         ax.set_title(title)
-        ax.set_xlabel("cold fraction at interval end (1 − Referenced/Rss)")
         ax.set_xlim(0, 1)
         ax.legend(loc="upper left", fontsize=7)
     axes[0, 0].set_ylabel("CDF over model_wait intervals")
+    fig.supxlabel("cold fraction at interval end (1 − Referenced / Rss)", fontsize=8, color=INK2)
     fig.tight_layout()
     fig.savefig(path)
     plt.close(fig)
@@ -307,6 +311,8 @@ def fig_peaks(panels, path):
             if m.any():
                 ax.scatter(tp.index[m], tp.ratio[m], s=14, color=PH_COLOR.get(ph, OTHER), edgecolor=SURF, lw=0.6,
                            label=f"peak in {ph} ({int(m.sum())})", zorder=3)
+        if tp.ratio.max() / max(tp.ratio.min(), 1e-9) > 10:
+            ax.set_yscale("log")
         ax.set_title(title)
         ax.set_xlabel("task (sorted by ratio)")
         ax.set_ylabel("peak / mean Rss")
@@ -380,7 +386,10 @@ def main():
         A["monitor"] = {"t_start": min(r["t_start"] for r in runs_meta), "t_stop": max(r.get("t_stop", sA.t.max()) for r in runs_meta),
                         "trees": int(segA.tree.nunique()), "sessions": int(segA.path.nunique()),
                         "kinds": segA.drop_duplicates("tree").kind.value_counts().to_dict(),
-                        "tree_hours": float((segA.t_to - segA.t_from).sum() / 3600)}
+                        "tree_hours": float((segA.t_to - segA.t_from).sum() / 3600),
+                        "last_sample": time.strftime("%Y-%m-%d %H:%M", time.localtime(sA.t.max())),
+                        "start": time.strftime("%Y-%m-%d %H:%M", time.localtime(min(r["t_start"] for r in runs_meta))),
+                        "complete": any("t_stop" in r and r["t_stop"] >= r["until"] - 60 for r in runs_meta)}
         A["detect_latency_s"] = {**stats(lat), "max": float(np.max(lat)), "frac_lt_1s": float(np.mean(lat < 1.0))}
         A["phases"] = {p: stats(ivmA[ivmA.phase == p].dur) for p in ("model_wait", "tool_exec", "user_wait")}
         A["unclosed_model_wait"] = int((ivmA.phase == "model_wait_unclosed").sum())
