@@ -62,7 +62,6 @@
   caption: [預先登記假設的判定。A＝整棵行程樹；B＝sandbox（容器 cgroup）。n 為區間數（H1、H2）或任務數（H3）。],
 ) <tab-h>
 
-#include "results.typ"
 
 #let t1row(w, t, p) = {
   let r = get(t, p)
@@ -100,13 +99,15 @@
   caption: [探索性換算：128 GB 主機（保留 10%）可容納的 sandbox 數。假設：各 sandbox 獨立、以每 sandbox 的時間平均或 p95 記憶體配置、只在 ≥ 5 秒的等模型區間把「整個區間都沒被觸碰」的頁（區間結束時的 Rss − Referenced）在區間開始時移出且無成本、慢速層容量不限、不計頁快取與跨 sandbox 共享頁。],
 ) <tab-density>
 
+#include "results.typ"
+
 = 量測開銷
 A 的量測器平均使用 #f(get(A, "overhead", "sampler_cpu_pct")) % 單核 CPU（vmtouch 另 #f(get(A, "overhead", "vmtouch_cpu_pct")) %），每次取樣中位數 #f(get(A, "overhead", "sample_ms", "median")) ms（p95 #f(get(A, "overhead", "sample_ms", "p95")) ms），自身 RSS 約 #f(get(A, "overhead", "sampler_rss_mb", "median")) MiB。微基準（目標行程反覆掃 256 MiB，每條件 #get(N, "bench", "none", "reps") 次 × 20 秒）：每秒讀一次 smaps_rollup 使掃頁吞吐量變化 #f(get(N, "bench", "read", "rel_to_none_pct")) %，再加上每秒 clear_refs 為 #f(get(N, "bench", "clear", "rel_to_none_pct")) %（未量測組的標準差為其平均的 #f(if get(N, "bench", "none") != none { 100 * get(N, "bench", "none", "pages_per_s_sd") / get(N, "bench", "none", "pages_per_s_mean") } else { none }) %）；minor fault 數三組相當（#f(get(N, "bench", "none", "minflt_mean"), d: 0)、#f(get(N, "bench", "read", "minflt_mean"), d: 0)、#f(get(N, "bench", "clear", "minflt_mean"), d: 0)）。在 x86 上清 accessed 位元不會使頁面失效，所以 clear_refs 主要成本是一次頁表走訪與 TLB flush，而非額外 page fault；計畫中預期的「少量額外 page fault」在本機未觀察到。單次 smaps_rollup 讀取中位數 #f(get(N, "bench", "latency_ms", "read", "median"), d: 2) ms、clear_refs #f(get(N, "bench", "latency_ms", "clear_refs", "median"), d: 2) ms（1 GiB 行程）。
 
 = 限制
-- *取樣粒度*：工具區間中位數不到 1 秒（表 1），1 Hz 樣本會漏掉多數短工具的尖峰，使 H3 偏低；10 Hz 補樣依賴即時偵測，而 Claude Code 偶爾延遲寫入 tool_use 記錄，補樣可能晚開始。敏感度結果見結果節。
+- *取樣粒度*：工具區間中位數不到 1 秒（@tab-1），1 Hz 樣本會漏掉多數短工具的尖峰，使 H3 偏低；10 Hz 補樣依賴即時偵測，而 Claude Code 偶爾延遲寫入 tool_use 記錄，補樣可能晚開始。敏感度結果見結果節。
 - *Referenced 的語意*：THP 設為 `always`，一個 2 MiB 大頁只要有一個子頁被碰就整頁算 Referenced，冷比例因此偏保守（低估）。共享頁（函式庫、node 執行檔）在每個行程的 Rss 中各算一次，ΣRss 高於實際占用；Pss 欄位供對照。
-- *clear 時機*：clear 發生在偵測到轉換之後，區間開頭一小段的觸碰不會被算進 Referenced，冷比例因此略為高估；覆蓋率中位數見 `numbers.json`。
+- *clear 時機*：clear 發生在偵測到轉換之後，區間開頭一小段的觸碰不會被算進 Referenced，冷比例因此略為高估；clear 後到區間結束的覆蓋率中位數為 A #pct(get(H, "H1", "A", "coverage", "median"))、B #pct(get(H, "H1", "B", "coverage", "median"))。
 - *頁快取*：clear_refs 只涵蓋已映射的頁，未映射的頁快取無法以無 root 方式量測是否被觸碰（idle page tracking 需 root）；B 的容器 cgroup 只被計入它首次讀入的檔案頁，映像層的頁快取多半記在 Docker daemon 名下。mincore 只給常駐量，不給觸碰與否。
 - *代表性*：A 只含單一使用者、單一主機、約兩天、且包含建置本工具的 session；B 的 harness 在容器外，與 harness 在 sandbox 內的部署（如 AgentCgroup）不同，因此 B 另報 harness + sandbox。B 為單一模型、單一 agent 框架。
 - *時鐘*：所有時間戳來自同一主機；Claude Code 的 assistant 記錄時間戳是區塊完成時間，user_wait 起點以同一回應最後一個區塊為準。

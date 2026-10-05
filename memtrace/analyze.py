@@ -17,6 +17,7 @@ import pandas as pd
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+import matplotlib.ticker  # noqa: E402,F401
 
 from .phases import intervals, transitions_from_file  # noqa: E402
 
@@ -56,7 +57,8 @@ def q(x, p):
 def stats(x):
     x = np.asarray(x, float)
     x = x[~np.isnan(x)]
-    return {"n": int(len(x)), "median": q(x, 50), "p95": q(x, 95), "mean": float(x.mean()) if len(x) else None}
+    return {"n": int(len(x)), "median": q(x, 50), "p95": q(x, 95), "mean": float(x.mean()) if len(x) else None,
+            "max": float(x.max()) if len(x) else None, "frac_zero": float(np.mean(x == 0)) if len(x) else None}
 
 
 # --------------------------------------------------------------------------- loading
@@ -214,7 +216,7 @@ def task_peaks(tasks, S, ivs, col="rss", burst=False, need_tools=True):
 
 # --------------------------------------------------------------------------- density (exploratory)
 def density(S, ivm, name, trees_windows, include_user_wait=False):
-    base, tier = [], []
+    base, tier, hit = [], [], 0
     q_iv = ivm[(ivm.phase.isin(["model_wait"] + (["user_wait"] if include_user_wait else []))) &
                (ivm.dur >= 5) & ivm[f"{name}_cold"].notna()]
     for tree, t0, t1 in trees_windows:
@@ -227,13 +229,14 @@ def density(S, ivm, name, trees_windows, include_user_wait=False):
         for r in q_iv[q_iv.tree == tree].itertuples():
             m = (t >= r.t0) & (t < r.t1)
             d[m] = np.maximum(rss[m] - getattr(r, f"{name}_cold_kb"), 0)
+            hit += int(m.sum())
         base.append(rss)
         tier.append(d)
     if not base:
         return None
     base, tier = np.concatenate(base) * KB, np.concatenate(tier) * KB
     cap = 0.9 * 128 * GIB
-    out = {"sandbox_seconds": int(len(base))}
+    out = {"sandbox_seconds": int(len(base)), "frac_time_tiered": hit / len(base)}
     for lab, f in (("mean", np.mean), ("p95", lambda x: np.percentile(x, 95))):
         mb, mt = float(f(base)), float(f(tier))
         out[lab] = {"per_sandbox_gib_base": mb / GIB, "per_sandbox_gib_tiered": mt / GIB,
@@ -313,9 +316,11 @@ def fig_peaks(panels, path):
                            label=f"peak in {ph} ({int(m.sum())})", zorder=3)
         if tp.ratio.max() / max(tp.ratio.min(), 1e-9) > 10:
             ax.set_yscale("log")
+            ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:g}"))
+            ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
         ax.set_title(title)
         ax.set_xlabel("task (sorted by ratio)")
-        ax.set_ylabel("peak / mean Rss")
+        ax.set_ylabel("peak / mean Pss")
         ax.legend(loc="upper left", fontsize=7)
     fig.tight_layout()
     fig.savefig(path)
@@ -438,7 +443,7 @@ def main():
         B["overhead"] = overhead_stats(load(RAW / "B" / "measure" / "overhead.csv"))
         mc = load(RAW / "B" / "measure" / "mincore.csv")
         if len(mc):
-            mc = mc[mc.status == "ok"]
+            mc = mc[(mc.status == "ok") & (mc.files > 0)]  # scans after container exit see an empty dir
             last = mc.sort_values("t").groupby("dir").tail(1)
             B["mincore_testbed"] = {"resident_frac": stats(last.resident_pages / last.total_pages),
                                     "size_mib": stats(last.total_pages * 4096 / (1 << 20)), "scan_s": stats(mc.elapsed)}
@@ -457,15 +462,20 @@ def main():
                 "cgroup_memory_current": task_peaks(tk, SB, ivB, col="cg_current", need_tools=False),
                 "pss": task_peaks(tk, SB, ivB, col="pss", need_tools=False)}
         B["H3_sensitivity"] = {k: (float(v.in_tool.mean()) if len(v) else None) for k, v in sens.items()}
+        tpk = task_peaks(tk, SB, ivB, col="pss", need_tools=False)
+        B["peaks"] = {"rss_gib": stats(tasksB.peak_kb / (1 << 20)), "pss_gib": stats(tpk.peak_kb / (1 << 20)),
+                      "cg_current_gib": stats(sens["cgroup_memory_current"].peak_kb / GIB),
+                      "max_procs": stats([SB.p[t].n.max() for t in tasksB.tree]),
+                      "runs_over_100_procs": int(sum(SB.p[t].n.max() > 100 for t in tasksB.tree))}
         B["H3_sensitivity"]["peak_phase_counts"] = tasksB.peak_phase.value_counts().to_dict() if len(tasksB) else {}
         B["table1_sandbox"] = table1(ivmB, "sandbox")
         B["table1_all"] = table1(ivmB, "all")
         B["tool_io"] = {c: stats(ivmB.get(f"sandbox_d_{c}", pd.Series(dtype=float))) for c in ("cg_rbytes", "cg_wbytes")}
         rep = runsB.groupby("instance_id").filter(lambda g: len(g) > 1)
         if len(rep):
-            pk = tasksB.set_index("tree")
+            pk = sens["cgroup_memory_current"].set_index("tree")  # cg_current is in bytes
             B["repeats"] = {iid: {"duration_s": [float(x) for x in (g.t_done - g.t_start)],
-                                  "peak_mib": [float(pk.peak_kb.get(t, np.nan) / KB) for t in g.tree],
+                                  "peak_cg_gib": [float(pk.peak_kb.get(t, np.nan) / GIB) for t in g.tree],
                                   "model_wait_median_s": [q(ivmB[(ivmB.tree == t) & (ivmB.phase == "model_wait")].dur, 50) for t in g.tree],
                                   "cold_median": [q(mw[mw.tree == t].sandbox_cold, 50) for t in g.tree]}
                             for iid, g in rep.groupby("instance_id")}
@@ -508,7 +518,8 @@ def main():
     cdf = ([("A: whole tree", ivmA, "tree_cold")] if len(sA) else []) + ([("B: sandbox", ivmB, "sandbox_cold"), ("B: harness + sandbox", ivmB, "all_cold")] if len(sB) else [])
     if cdf:
         fig_cold_cdf(cdf, FIG / "fig2_cold_cdf.pdf")
-    pk = ([("A: user turns", tasksA)] if len(sA) else []) + ([("B: runs (sandbox Rss)", tasksB)] if len(sB) else [])
+    pk = ([("A: user turns (whole tree)", task_peaks(a_tasks(ivA, segA), SA, ivA, col="pss"))] if len(sA) else []) + \
+         ([("B: runs (sandbox)", task_peaks(b_tasks(ivB, runsB), SB, ivB, col="pss", need_tools=False))] if len(sB) else [])
     if pk:
         fig_peaks(pk, FIG / "fig3_peaks.pdf")
     io = []
