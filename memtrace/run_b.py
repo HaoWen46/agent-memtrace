@@ -46,7 +46,7 @@ def order():
     return [(iid, ds[iid], get_swebench_docker_image_name(ds[iid])) for iid in ids]
 
 
-def select(out, env):
+def select(out, env, n=N):
     """Pull images in the pre-registered order until N succeed; returns selected instances."""
     sel_path = out / "selection.csv"
     done = {}
@@ -58,7 +58,7 @@ def select(out, env):
         if not done:
             w.writeheader()
         for rank, (iid, inst, image) in enumerate(order()):
-            if len(chosen) == N:
+            if len(chosen) == n:
                 break
             if iid in done:
                 if done[iid]["status"] == "ok":
@@ -126,17 +126,18 @@ def main():
     ap.add_argument("--cost-limit", type=float, default=1.0)
     ap.add_argument("--wall-limit", type=int, default=2400)
     ap.add_argument("--limit-runs", type=int, default=None, help="pilot: only the first K runs")
+    ap.add_argument("--n", type=int, default=N, help="instances to select (pre-registered: 24; smaller only for smoke tests)")
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     env = docker_env()
-    chosen = select(out, env)
+    chosen = select(out, env, a.n)
     if a.pull_only:
         return
     a.model = a.model or env.get("MEMTRACE_MODEL")
     queue = [(inst, 0) for inst in chosen] + [(inst, r) for inst in chosen[:REPEAT_IDS] for r in range(1, REPEATS + 1)]
     queue = queue[: a.limit_runs] if a.limit_runs else queue
-    (out / f"config-{int(time.time())}.json").write_text(json.dumps({**vars(a), "seed": SEED, "n": N, "runs": len(queue)}))
+    (out / f"config-{int(time.time())}.json").write_text(json.dumps({**vars(a), "seed": SEED, "runs": len(queue)}))
     s = Sampler(str(out / "measure"), rotate=False, clear=True)
     runs = Runs(out, queue, env, a)
     s.run(hook=runs.hook, hook_every=1.0)

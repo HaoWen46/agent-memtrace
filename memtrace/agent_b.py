@@ -53,6 +53,16 @@ class InstrumentedAgent(DefaultAgent):
         return self.add_messages(*self.model.format_observation_messages(message, outputs, self.get_template_vars()))
 
 
+def _out(*actions):
+    return {"role": "assistant", "content": "smoke", "extra": {"actions": [{"command": c} for c in actions]}}
+
+
+# Pipeline smoke test without an API key: scripted model delays (/sleep) and real container commands.
+SMOKE = [_out("/sleep 6"), _out("cd /testbed && git status | head -5"), _out("/sleep 7"),
+         _out("python -c 'import time; x = bytearray(300 << 20); time.sleep(3)'"), _out("/sleep 5"),
+         _out("grep -rl import /testbed | head -3"), _out("echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT")]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--instance", required=True, help="path to the instance JSON")
@@ -69,10 +79,12 @@ def main():
         "model": {"model_name": a.model, "cost_tracking": "ignore_errors"},
         "agent": {"step_limit": a.step_limit, "cost_limit": a.cost_limit, "wall_time_limit_seconds": a.wall_limit},
     })
+    if a.model == "smoke":
+        config["model"] = {"model_class": "deterministic", "model_name": "deterministic", "outputs": SMOKE}
     events = open(out / "events.jsonl", "a", buffering=1)
-    model = get_model(config=config.get("model", {}))
-    agent, env, exit_status, result, extra = None, None, None, None, {}
+    agent, env, model, exit_status, result, extra = None, None, None, None, None, {}
     try:
+        model = get_model(config=config.get("model", {}))
         env = get_sb_environment(config, instance)
         pid = int(subprocess.run([env.config.executable, "inspect", "-f", "{{.State.Pid}}", env.container_id],
                                  capture_output=True, text=True, check=True).stdout)

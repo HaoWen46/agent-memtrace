@@ -21,7 +21,7 @@ print("ready", flush=True); sys.stdin.readline()
 t_end = time.time() + float(sys.argv[1]); n = 0
 while time.time() < t_end:
     hot[::4096] += 1; n += 1
-print(n, flush=True)
+print(n, flush=True); sys.stdin.readline()                     # stay alive until final stats are read
 """
 
 
@@ -32,7 +32,7 @@ def run(cond, dur, lat):
     p.stdin.write("go\n")
     p.stdin.flush()
     t_end = time.time() + dur
-    while time.time() < t_end - 0.5:
+    while time.time() < t_end - 1.0:
         time.sleep(1.0)
         if cond in ("read", "clear"):
             t0 = time.perf_counter()
@@ -42,8 +42,10 @@ def run(cond, dur, lat):
             t0 = time.perf_counter()
             procfs.clear_refs(p.pid)
             lat.writerow({"cond": cond, "op": "clear_refs", "ms": f"{(time.perf_counter() - t0) * 1e3:.3f}"})
-    f1 = procfs.stat(p.pid)
     sweeps = int(p.stdout.readline())
+    f1 = procfs.stat(p.pid)
+    p.stdin.write("bye\n")
+    p.stdin.flush()
     p.wait()
     return {"cond": cond, "dur_s": dur, "sweeps": sweeps, "pages_per_s": f"{sweeps * 65536 / dur:.0f}",
             "minflt": f1["minflt"] - f0["minflt"], "majflt": f1["majflt"] - f0["majflt"],
