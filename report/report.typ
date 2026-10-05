@@ -6,6 +6,8 @@
 #show heading: set block(above: 1em, below: 0.6em)
 #show raw: set text(font: ("DejaVu Sans Mono", "AR PL UMing TW"), size: 8pt)
 #show figure.caption: set text(size: 8.5pt)
+#show figure.where(kind: table): set figure(supplement: "表")
+#show figure.where(kind: image): set figure(supplement: "圖")
 #set table(stroke: (x, y) => if y == 0 { (bottom: 0.6pt) } else { none }, inset: (x: 4pt, y: 2.5pt))
 
 // Every number below is read from numbers.json, which memtrace/analyze.py recomputes from raw/.
@@ -64,6 +66,7 @@
     [H3 尖峰在工具內比例], [≥ 80%], [#pct(get(H, "H3", "A", "frac_in_tool"))（#get(H, "H3", "A", "n")）], [#verdict(get(H, "H3", "A", "holds"))],
       [#pct(get(H, "H3", "B", "frac_in_tool"))（#get(H, "H3", "B", "n")）], [#verdict(get(H, "H3", "B", "holds"))],
   ),
+  numbering: none,
   caption: [預先登記假設的判定。A＝整棵行程樹；B＝sandbox（容器 cgroup）。n 為區間數（H1、H2）或任務數（H3）。],
 ) <tab-h>
 
@@ -86,7 +89,7 @@
     ..for p in ("model_wait", "tool_exec") { t1row("B sandbox", get(B, "table1_sandbox"), p) },
     ..for p in ("model_wait", "tool_exec") { t1row("B 全部", get(B, "table1_all"), p) },
   ),
-  caption: [表 1：各階段的中位數 / p95。Rss、Pss 為區間內 1 Hz 樣本的平均；冷比例取區間結束前最後一個樣本，n 為有效區間數（短於 1 秒的區間多半沒有樣本）。B 全部 = harness + sandbox。],
+  caption: [各階段的中位數 / p95。Rss、Pss 為區間內 1 Hz 樣本的平均；冷比例取區間結束前最後一個樣本，n 為有效區間數（短於 1 秒的區間多半沒有樣本）。B 全部 = harness + sandbox。],
 ) <tab-1>
 
 #let drow(lab, d) = if d == none { () } else {
