@@ -18,9 +18,7 @@
   #text(8.5pt, fill: rgb("#52514e"))[資料產生 #N.meta.generated · git #N.meta.git · 預先登記 sha256 #raw(N.meta.prereg_sha256.slice(0, 16))…]
 ]
 
-#if get(A, "monitor", "complete") != true [
-  #block(fill: rgb("#fdf3e1"), inset: 6pt, radius: 3pt, width: 100%)[*草稿*：A 的監測窗預定到 2026-10-08 09:00，本版只含 #get(A, "monitor", "start") 至 #get(A, "monitor", "last_sample") 的資料；A 的數字與判定在最終版會改變。B 已完成。]
-]
+#block(fill: rgb("#fdf3e1"), inset: 6pt, radius: 3pt, width: 100%)[最終版。A 監測於 #tpe(get(A, "monitor", "t_stop")) 提前結束（預登記原訂 09:00），之後無任何 session，資料不受影響。]
 
 #include "summary.typ"
 
@@ -109,7 +107,8 @@ A 的量測器平均使用 #f(get(A, "overhead", "sampler_cpu_pct")) % 單核 CP
 - *Referenced 的語意*：THP 設為 `always`，一個 2 MiB 大頁只要有一個子頁被碰就整頁算 Referenced，冷比例因此偏保守（低估）。共享頁（函式庫、node 執行檔）在每個行程的 Rss 中各算一次，ΣRss 高於實際占用；Pss 欄位供對照。
 - *clear 時機*：clear 發生在偵測到轉換之後，區間開頭一小段的觸碰不會被算進 Referenced，冷比例因此略為高估；clear 後到區間結束的覆蓋率中位數為 A #pct(get(H, "H1", "A", "coverage", "median"))、B #pct(get(H, "H1", "B", "coverage", "median"))。
 - *頁快取*：clear_refs 只涵蓋已映射的頁，未映射的頁快取無法以無 root 方式量測是否被觸碰（idle page tracking 需 root）；B 的容器 cgroup 只被計入它首次讀入的檔案頁，映像層的頁快取多半記在 Docker daemon 名下。mincore 只給常駐量，不給觸碰與否。
-- *代表性*：A 只含單一使用者、單一主機、約兩天、且包含建置本工具的 session；B 的 harness 在容器外，與 harness 在 sandbox 內的部署（如 AgentCgroup）不同，因此 B 另報 harness + sandbox。B 為單一模型、單一 agent 框架。
+- *代表性*：A 只含單一使用者、單一主機、#tpe(get(A, "monitor", "t_start")) 至 #tpe(get(A, "monitor", "t_stop"))、且包含建置本工具的 session；B 的 harness 在容器外，與 harness 在 sandbox 內的部署（如 AgentCgroup）不同，因此 B 另報 harness + sandbox。B 為單一模型、單一 agent 框架。
+- *提前結束*：A 監測於 #tpe(get(A, "monitor", "t_stop")) 提前結束（預登記原訂 09:00），之後無任何 session，資料不受影響。
 - *時鐘*：所有時間戳來自同一主機；Claude Code 的 assistant 記錄時間戳是區塊完成時間，user_wait 起點以同一回應最後一個區塊為準。
 
 本報告不推論「agent 很省記憶體」或任何超出上述量測範圍的結論。
